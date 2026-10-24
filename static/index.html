@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pose-Not-Pixels — gait &amp; kinematics from landmarks only</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 900px; margin: 2rem auto; padding: 0 1rem; color: #111; }
+  .disclaimer { border: 3px solid #b00; background: #fff3f3; padding: 1rem; margin-bottom: 1.5rem; }
+  button { padding: .5rem 1rem; margin-right: .5rem; cursor: pointer; }
+  button.active { background: #111; color: #fff; }
+  table { border-collapse: collapse; margin: 1rem 0; }
+  td, th { border: 1px solid #ccc; padding: .3rem .6rem; text-align: left; }
+  .red { color: #b00; font-weight: bold; } .amber { color: #946b00; font-weight: bold; } .green { color: #0a6b0a; }
+  #skeleton { border: 1px solid #ccc; background: #fafafa; }
+  pre { background: #f4f4f4; padding: 1rem; overflow: auto; white-space: pre-wrap; }
+  .guide { background: #f4f8ff; padding: 1rem; margin: 1rem 0; }
+</style>
+</head>
+<body>
+<h1>Pose-Not-Pixels</h1>
+<p>Gait / Timed Up and Go trend and knee &amp; hip arthritis kinematics screening — from <strong>skeleton landmarks only</strong>. Video never leaves the device and never reaches a model.</p>
+
+<div class="disclaimer" id="disclaimer">
+  <h2>⚠️ PROOF OF CONCEPT — NOT CLINICALLY TESTED</h2>
+  <p><strong>This tool has not been tested clinically and is a proof-of-concept for research and software demonstration only. It is not a medical device, it does not diagnose, treat, or rule out any condition, and its outputs may be wrong — including false positives and false negatives.</strong></p>
+  <p><strong>Do not use it to make decisions about your health.</strong> For any medical issue or concern, seek a licensed healthcare professional. <strong>In an emergency, go to your nearest emergency room or dial 911 immediately.</strong></p>
+  <p>All screening thresholds in this product are app-defined and <strong>UNVALIDATED</strong>, except the STEADI TUG value, which is a screening flag only (see below). Accuracy figures for this product do not exist yet — no validated performance numbers are claimed. Results below are screening patterns for clinician review only.</p>
+</div>
+
+<div class="guide">
+  <h2>Capture guide (read before recording)</h2>
+  <ul>
+    <li><strong>Camera:</strong> phone on a stable surface or tripod, hip height, 3–4 metres from the walk path, framing the whole body. Front pass: walk toward the camera. Side pass: walk across the frame. TUG: chair, 3-metre walk, turn, walk back, sit.</li>
+    <li><strong>Clothing:</strong> fitted clothes; loose trousers and long coats hide knees and hips and degrade the landmarks.</li>
+    <li><strong>Walking aids:</strong> note any cane, walker or helper in the capture notes — aids change gait numbers and can occlude ankles. A capture with an aid is not comparable to one without.</li>
+    <li><strong>2D-pose proxy limits:</strong> a single phone camera gives a 2D proxy, not lab motion capture. Frontal alignment and range estimates degrade with camera angle, distance and occlusion. Repeat captures with the same phone, same setup, same shoes.</li>
+    <li><strong>Privacy:</strong> in the real integration path, video is converted to landmarks on the device and deleted by default. This demo uses synthetic landmark JSON only — no video is uploaded anywhere.</li>
+  </ul>
+</div>
+
+<h2>Demo</h2>
+<p>
+  <button id="btn-tug" class="active" onclick="showPack('tug')">Pack 1 — Falls / TUG trend</button>
+  <button id="btn-arth" onclick="showPack('arthritis')">Pack 2 — Knee &amp; Hip Arthritis Kinematics</button>
+</p>
+<div id="tug-controls">
+  <label>TUG scenario:
+    <select id="tug-scenario">
+      <option value="tug_standard">tug_standard (10.4 s)</option>
+      <option value="tug_slow">tug_slow (15.2 s, above 12 s reference)</option>
+    </select>
+  </label>
+  <button onclick="runTug()">Run demo TUG</button>
+</div>
+<div id="arth-controls" style="display:none">
+  <label>Arthritis scenario:
+    <select id="arth-scenario">
+      <option value="arthritis_straight">arthritis_straight</option>
+      <option value="arthritis_varus_left">arthritis_varus_left</option>
+      <option value="arthritis_asymmetric">arthritis_asymmetric</option>
+    </select>
+  </label>
+  <button onclick="runArth()">Run demo screening</button>
+</div>
+<p>
+  <label>Tier:
+    <select id="tier">
+      <option value="frugal">frugal (phrasing only)</option>
+      <option value="full">full (richer context + number verifier)</option>
+    </select>
+  </label>
+  <button onclick="loadTrend()">Show trend (demo patient)</button>
+</p>
+
+<h2>Results</h2>
+<div id="results"><p>No capture yet. Run a demo above.</p></div>
+<h3>Skeleton overlay (from landmark coordinates — evidence, not video)</h3>
+<svg id="skeleton" width="400" height="420" viewBox="-0.6 -0.1 1.2 1.9"></svg>
+<p><small>The skeleton is drawn from landmark coordinates. No video frames are stored or displayed.</small></p>
+<h2>Trend</h2>
+<div id="trend"><p>Run demos, then load the trend to see deltas vs the previous capture.</p></div>
+
+<script>
+const BONES = [
+  ["left_shoulder","right_shoulder"],["left_shoulder","left_hip"],["right_shoulder","right_hip"],
+  ["left_hip","right_hip"],["left_hip","left_knee"],["left_knee","left_ankle"],
+  ["right_hip","right_knee"],["right_knee","right_ankle"],
+  ["left_shoulder","left_elbow"],["left_elbow","left_wrist"],
+  ["right_shoulder","right_elbow"],["right_elbow","right_wrist"],
+  ["nose","left_shoulder"],["nose","right_shoulder"],
+];
+let pack = 'tug';
+function showPack(p) {
+  pack = p;
+  document.getElementById('btn-tug').className = p === 'tug' ? 'active' : '';
+  document.getElementById('btn-arth').className = p === 'arthritis' ? 'active' : '';
+  document.getElementById('tug-controls').style.display = p === 'tug' ? 'block' : 'none';
+  document.getElementById('arth-controls').style.display = p === 'arthritis' ? 'block' : 'none';
+}
+function tierHeader() { return {'X-Tier': document.getElementById('tier').value}; }
+function flagsTable(flags) {
+  if (!flags || !flags.length) return '<p>No flags.</p>';
+  let rows = flags.map(f => `<tr><td>${f.metric}</td><td>${f.leg || '—'}</td><td>${f.value} ${f.unit}${f.uncertainty_band_deg ? ' ±' + f.uncertainty_band_deg + ' deg' : ''}</td><td class="${f.status}">${f.status}</td><td>${f.threshold_status} — ${f.threshold_source} ${f.caveat || ''}</td></tr>`).join('');
+  return `<table><tr><th>Metric</th><th>Leg</th><th>Value</th><th>Flag</th><th>Threshold (app-defined, UNVALIDATED) + caveat</th></tr>${rows}</table>`;
+}
+function drawSkeleton(landmarks) {
+  const svg = document.getElementById('skeleton');
+  svg.innerHTML = '';
+  if (!landmarks) return;
+  const NS = 'http://www.w3.org/2000/svg';
+  const Y = y => 1.8 - y;
+  for (const [a, b] of BONES) {
+    if (!landmarks[a] || !landmarks[b]) continue;
+    const line = document.createElementNS(NS, 'line');
+    line.setAttribute('x1', landmarks[a].x); line.setAttribute('y1', Y(landmarks[a].y));
+    line.setAttribute('x2', landmarks[b].x); line.setAttribute('y2', Y(landmarks[b].y));
+    line.setAttribute('stroke', '#111'); line.setAttribute('stroke-width', '0.02');
+    svg.appendChild(line);
+  }
+  for (const [name, lm] of Object.entries(landmarks)) {
+    const c = document.createElementNS(NS, 'circle');
+    c.setAttribute('cx', lm.x); c.setAttribute('cy', Y(lm.y)); c.setAttribute('r', '0.03'); c.setAttribute('fill', '#b00');
+    const t = document.createElementNS(NS, 'title'); t.textContent = name;
+    c.appendChild(t); svg.appendChild(c);
+  }
+}
+async function runTug() {
+  const sc = document.getElementById('tug-scenario').value;
+  const r = await fetch(`/api/demo/tug?scenario=${sc}`, {method: 'POST', headers: tierHeader()});
+  const d = await r.json();
+  const m = d.metrics;
+  document.getElementById('results').innerHTML =
+    `<p><strong>Scenario:</strong> ${d.scenario} &nbsp; <strong>Tier:</strong> ${d.tier} &nbsp; <strong>Phase method:</strong> ${m.phase_method}</p>` +
+    `<table><tr><th>Metric</th><th>Value</th></tr>` +
+    `<tr><td>TUG total</td><td>${m.tug_total_s} s — ${m.tug_flag_label} at &ge;12 s (STEADI screening flag only, not a risk label)</td></tr>` +
+    `<tr><td>Sit-to-stand</td><td>${m.sit_to_stand_s} s</td></tr>` +
+    `<tr><td>Walk</td><td>${m.walk_s} s</td></tr>` +
+    `<tr><td>Turn</td><td>${m.turn_s} s</td></tr>` +
+    `<tr><td>Gait speed proxy</td><td>${m.gait_speed_proxy_leg_lengths_per_s} leg lengths/s</td></tr>` +
+    `<tr><td>Step count estimate</td><td>${m.step_count_estimate}</td></tr>` +
+    `<tr><td>Cadence</td><td>${m.cadence_steps_per_min} steps/min</td></tr>` +
+    `<tr><td>Stance-time asymmetry</td><td>${m.stance_time_asymmetry_pct} %</td></tr>` +
+    `<tr><td>TUG flag</td><td class="${m.tug_flag === 'steadi_screening_flag' ? 'red' : 'green'}">${m.tug_flag_label}</td></tr><tr><td>TUG caveat</td><td>${m.tug_caveat}</td></tr></table>` +
+    `<p><strong>Summary (gateway phrasing of metrics JSON only):</strong> ${d.summary.summary}</p>` +
+    (d.summary.verifier ? `<p><strong>Full-tier verifier:</strong> ${JSON.stringify(d.summary.verifier)}</p>` : '');
+  drawSkeleton(null);
+}
+async function runArth() {
+  const sc = document.getElementById('arth-scenario').value;
+  const r = await fetch(`/api/demo/arthritis?scenario=${sc}`, {method: 'POST', headers: tierHeader()});
+  const d = await r.json();
+  const m = d.metrics;
+  document.getElementById('results').innerHTML =
+    `<p><strong>Scenario:</strong> ${d.scenario} &nbsp; <strong>Tier:</strong> ${d.tier} &nbsp; <strong>Screening flag:</strong> <span class="${m.screening_flag}">${m.screening_flag}</span></p>` +
+    `<p>${m.screening_note}</p>` +
+    `<table><tr><th>Metric</th><th>Value</th></tr>` +
+    `<tr><td>HKA deviation, left / right</td><td>${m.hka.left?.deviation_deg} &plusmn;3 / ${m.hka.right?.deviation_deg} &plusmn;3 deg (frontal HKA is never reported as if radiographic; &plusmn;3 deg minimum uncertainty band)</td></tr>` +
+    `<tr><td>Pelvic obliquity</td><td>${m.pelvic_obliquity_deg} deg</td></tr>` +
+    `<tr><td>Lateral trunk lean</td><td>${m.lateral_trunk_lean_deg} deg</td></tr>` +
+    `<tr><td>Knee flexion ROM</td><td>${m.knee_flexion_rom_deg} deg</td></tr>` +
+    `<tr><td>Hip flexion/extension ROM</td><td>${m.hip_flexion_extension_rom_deg} deg</td></tr>` +
+    `<tr><td>Varus thrust proxy</td><td>${JSON.stringify(m.varus_thrust_proxy_deg)} deg</td></tr>` +
+    `<tr><td>Trendelenburg drop</td><td>${JSON.stringify(m.trendelenburg_drop_deg)} deg</td></tr>` +
+    `<tr><td>Stance-time asymmetry</td><td>${m.stance_time_asymmetry_pct} %</td></tr>` +
+    `<tr><td>Stride-length asymmetry</td><td>${m.stride_length_asymmetry_pct} %</td></tr>` +
+    `<tr><td>Cadence</td><td>${m.cadence_steps_per_min} steps/min</td></tr>` +
+    `<tr><td>Step width (normalised)</td><td>${m.step_width_norm_leg_lengths} leg lengths</td></tr></table>` +
+    flagsTable(m.flags) +
+    `<p><strong>Summary (gateway phrasing of metrics JSON only):</strong> ${d.summary.summary}</p>` +
+    (d.summary.verifier ? `<p><strong>Full-tier verifier:</strong> ${JSON.stringify(d.summary.verifier)}</p>` : '');
+  drawSkeleton({
+    nose: {x: 0, y: 1.70}, left_shoulder: {x: -0.20, y: 1.45}, right_shoulder: {x: 0.20, y: 1.45},
+    left_hip: {x: -0.15, y: 0.95}, right_hip: {x: 0.15, y: 0.95},
+    left_knee: {x: -0.15, y: 0.50}, right_knee: {x: 0.15, y: 0.50},
+    left_ankle: {x: -0.15, y: 0.05}, right_ankle: {x: 0.15, y: 0.05},
+    left_elbow: {x: -0.28, y: 1.15}, right_elbow: {x: 0.28, y: 1.15},
+    left_wrist: {x: -0.30, y: 0.85}, right_wrist: {x: 0.30, y: 0.85},
+  });
+}
+async function loadTrend() {
+  const r = await fetch('/api/patients/demo/trend');
+  const d = await r.json();
+  if (!d.captures.length) { document.getElementById('trend').innerHTML = '<p>No demo captures yet.</p>'; return; }
+  document.getElementById('trend').innerHTML = d.captures.map(c => {
+    const m = c.metrics;
+    const main = c.kind === 'tug' ? `TUG ${m.tug_total_s} s` : `screening ${m.screening_flag}, HKA L ${m.hka.left?.deviation_deg} / R ${m.hka.right?.deviation_deg} deg`;
+    return `<p>${c.kind} — ${main} — delta vs previous: ${c.delta_vs_previous ? JSON.stringify(c.delta_vs_previous) : 'first capture'}</p>`;
+  }).join('');
+}
+</script>
+</body>
+</html>
