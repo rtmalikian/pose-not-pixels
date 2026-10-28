@@ -9,6 +9,8 @@
 > For any medical issue or concern, seek a licensed healthcare professional.
 > **In an emergency, go to your nearest emergency room or dial 911 immediately.**
 
+▶ **Try the live demo:** https://rtmalikian.github.io/pose-not-pixels/ — static preview with demo data, no backend connected.
+
 # Pose-Not-Pixels — a 30-second TUG test and knee/hip gait screen, as numbers and a trend, with zero video sent to any model
 
 **The measurable upgrade.** Today a Timed Up and Go (TUG) test is a stopwatch number on paper, and a gait screen is a clinician's eye — neither trends over time at home, and neither is comparable month to month. Pose-Not-Pixels turns a phone capture into five TUG numbers and a full knee/hip kinematics panel, stored per patient, with deltas vs the previous capture — and it does it without ever sending video to a model. The video is reduced to 33 skeleton landmarks on the device; deterministic code computes every number; the model only phrases ~100 tokens of metrics JSON into a plain-language note. That is the whole privacy and cost story: **video = 0 tokens, 0 model calls, 0 frames in any gateway log** (asserted in CI).

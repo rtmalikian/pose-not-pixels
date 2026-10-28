@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Pose-Not-Pixels — live preview (demo data)</title><style>
+:root{--bg:#0d1117;--card:#161b22;--line:#30363d;--txt:#e6edf3;--dim:#9da7b3;--acc:#58a6ff}
+*{box-sizing:border-box}body{margin:0;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--txt);line-height:1.55}
+.wrap{max-width:880px;margin:0 auto;padding:28px 18px 60px}
+.disclaimer{border:2px solid #d29922;background:#2b2108;border-radius:10px;padding:14px 18px;margin-bottom:18px}
+.disclaimer h2{margin:0 0 6px;font-size:1.05rem;color:#f0b72f}.disclaimer p{margin:6px 0;font-size:.93rem}
+.badge{display:inline-block;background:#b62324;color:#fff;font-weight:700;letter-spacing:.06em;padding:3px 12px;border-radius:999px;font-size:.8rem}
+h1{margin:14px 0 4px;font-size:2rem}.tag{color:var(--dim);font-size:1.08rem;margin:0 0 16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px;margin:16px 0}
+.card h2{margin-top:0;font-size:1.15rem}
+a{color:var(--acc)}button{background:var(--acc);color:#04121f;border:0;font-weight:700;padding:9px 18px;border-radius:8px;cursor:pointer;font-size:.95rem}
+button:disabled{background:#444c56;color:#9da7b3;cursor:not-allowed}
+input[type=range]{width:220px}textarea{width:100%;background:#0d1117;color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:10px;font-family:inherit}
+pre{background:#0d1117;border:1px solid var(--line);border-radius:8px;padding:12px;overflow:auto;font-size:.85rem}
+table{border-collapse:collapse;width:100%;font-size:.92rem}td,th{border:1px solid var(--line);padding:6px 9px;text-align:left}
+.ok{color:#3fb950}.warn{color:#d29922}.bad{color:#f85149}.out{display:none}
+label{display:block;margin:8px 0 2px}.small{color:var(--dim);font-size:.86rem}
+code{background:#21262d;padding:1px 6px;border-radius:5px}
+</style></head>
+<body><div class="wrap">
+<div class="disclaimer">
+<h2>⚠️ PROOF OF CONCEPT — NOT CLINICALLY TESTED</h2>
+<p><strong>This tool has not been tested clinically and is a proof-of-concept for
+research and software demonstration only. It is not a medical device, it
+does not diagnose, treat, or rule out any condition, and its outputs may
+be wrong — including false positives and false negatives.</strong></p>
+<p><strong>Do not use it to make decisions about your health.</strong>
+For any medical issue or concern, seek a licensed healthcare professional.
+<strong>In an emergency, go to your nearest emergency room or dial 911 immediately.</strong></p>
+</div>
+<span class="badge">DEMO DATA</span>
+<h1>Pose-Not-Pixels</h1>
+<p class="tag">TUG trend and knee/hip arthritis kinematics from skeleton landmarks only. Video never reaches a model.</p>
+<p class="small">Static GitHub Pages preview. <strong>No backend and no AI model are connected</strong> —
+everything below runs in your browser on pretend data and shows sample outputs only.
+The real tool is open source and self-hostable:
+<a href="https://github.com/rtmalikian/pose-not-pixels">github.com/rtmalikian/pose-not-pixels</a></p>
+<div class="card"><h2>Try the mini-demo</h2>
+<p class="small">The real tool turns video into 33 skeleton landmarks on-device, then does deterministic maths in code — the model only phrases ~100 tokens of metrics JSON. Try sample metrics:</p>
+<label>Timed Up and Go: <b id="pp-tugv">11.8</b>s <input type="range" id="pp-tug" min="6" max="25" step="0.1" value="11.8" oninput="ppGo()"></label>
+<label>Stance-time asymmetry: <b id="pp-asv">4</b>% <input type="range" id="pp-as" min="0" max="30" step="1" value="4" oninput="ppGo()"></label>
+<pre id="pp-out"></pre>
+<p class="small">Screening information for clinician review only. The 12s TUG point is a CDC STEADI screening flag ("discuss with a clinician"), not a risk label; all other thresholds are app-defined and unvalidated. Sensitivity/specificity are unknown until clinical validation.</p>
+</div>
+<div class="card"><h2>Run the real thing (self-hosted)</h2>
+<p>Clone the repo and start it with Docker Compose — it ships with an embedded OpenAI-compatible gateway (stub / local model / any OpenAI-compatible upstream), so PHI never has to leave your machine:<pre>git clone https://github.com/rtmalikian/pose-not-pixels
+cd pose-not-pixels
+docker compose up</pre></p>
+<p><a href="https://github.com/rtmalikian/pose-not-pixels">→ Full README, source, tests and roadmap on GitHub</a></p></div>
+<p class="small">Built by Raphael Malikian — healthcare founder/operator, now building clinical AI. Open to collaboration.</p>
+</div><script>function ppGo(){var t=+document.getElementById('pp-tug').value,a=+document.getElementById('pp-as').value;
+document.getElementById('pp-tugv').textContent=t.toFixed(1);document.getElementById('pp-asv').textContent=a;
+var o={tug_seconds:t,stance_asymmetry_pct:a,video_sent_to_model:false,flag:t>=12?'STEADI screening flag — discuss with clinician':'no flag on this sample'};
+document.getElementById('pp-out').textContent=JSON.stringify(o,null,2);}ppGo();</script></body></html>
